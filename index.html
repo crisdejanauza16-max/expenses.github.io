@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dejan Expenses Tracking</title>
+
+    <!-- ✅ PWA SUPPORT - ALREADY ADDED -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#219653">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="green">
+    <meta name="apple-mobile-web-app-title" content="Dejan Expenses">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <script>
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('✅ App Ready to Install!', reg.scope))
+          .catch(err => console.log('❌ SW Error:', err));
+      });
+    }
+
+    // Install Button Logic
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+    });
+    async function installApp() {
+      if (!deferredPrompt) {
+        alert('✅ Already installed or not ready yet!\n\n👉 On Android: Tap 3 dots → "Install App"\n👉 On iPhone: Tap Share → "Add to Home Screen"');
+        return;
+      }
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      alert(outcome === 'accepted' ? '🎉 App Installed!' : 'Maybe next time!');
+      deferredPrompt = null;
+    }
+    </script>
+    <!-- ✅ END OF PWA CODE -->
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        :root {
+            --primary-green: #2ecc71;
+            --dark-green: #27ae60;
+            --light-green: #eafaf1;
+            --accent-green: #82e0aa;
+            --sidebar-bg: #219653;
+            --white: #ffffff;
+            --text-dark: #2c3e50;
+            --text-muted: #7f8c8d;
+            --shadow: 0 8px 32px rgba(46, 204, 113, 0.15);
+            --radius: 16px;
+        }
+
+        body {
+            background: #f8fefb;
+            min-height: 100vh;
+            display: flex;
+            color: var(--text-dark);
+        }
+
+        /* === SIDEBAR === */
+        .sidebar {
+            width: 260px;
+            background: linear-gradient(180deg, var(--sidebar-bg) 0%, var(--dark-green) 100%);
+            color: white;
+            padding: 30px 20px;
+            position: fixed;
+            height: 100vh;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .sidebar-logo {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .sidebar-logo h1 {
+            font-size: 1.4rem;
+            line-height: 1.3;
+        }
+
+        .sidebar-logo span {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            display: block;
+            margin-top: 5px;
+        }
+
+        .install-btn {
+            background: rgba(255,255,255,0.25);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.4);
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+        }
+        .install-btn:hover {
+            background: rgba(255,255,255,0.4);
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sidebar-nav button {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: none;
+            padding: 14px 18px;
+            border-radius: 12px;
+            text-align: left;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-nav button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateX(4px);
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            font-size: 0.85rem;
+            opacity: 0.7;
+            text-align: center;
+        }
+
+        /* === MAIN CONTENT === */
+        .main-content {
+            margin-left: 260px;
+            flex: 1;
+            padding: 30px 40px;
+        }
+
+        .balance-card {
+            background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+            color: white;
+            padding: 35px;
+            border-radius: var(--radius);
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(46, 204, 113, 0.25);
+        }
+
+        .balance-card h2 {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .balance-amount {
+            font-size: 3rem;
+            font-weight: 700;
+        }
+
+        .future-balance-card {
+            background: linear-gradient(135deg, #27ae60 0%, #1e8449 100%);
+            color: white;
+            padding: 25px;
+            border-radius: var(--radius);
+            margin-bottom: 30px;
+            box-shadow: 0 8px 25px rgba(39, 174, 96, 0.2);
+        }
+
+        .future-balance-card h3 {
+            margin-bottom: 18px;
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .future-balance-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: rgba(255,255,255,0.18);
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+
+        .future-balance-item .date {
+            font-weight: 500;
+        }
+
+        .future-balance-item .amount {
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 15px;
+                padding: 15px;
+            }
+            .sidebar-logo {
+                border-bottom: none;
+                padding-bottom: 0;
+            }
+            .sidebar-nav {
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+            .sidebar-nav button {
+                padding: 10px 14px;
+                font-size: 0.85rem;
+            }
+            .main-content {
+                margin-left: 0;
+                padding: 20px 15px;
+            }
+        }
+
+        .card {
+            background: var(--white);
+            padding: 25px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .card h3 {
+            color: var(--dark-green);
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 8px 0;
+            border: 2px solid #e8f5e9;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-green);
+            box-shadow: 0 0 0 4px rgba(46, 204, 113, 0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+            color: white;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 12px;
+            border-radius: 10px;
+            width: 100%;
+            margin-top: 8px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(46, 204, 113, 0.3);
+        }
+
+        .btn-delete {
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-left: auto;
+        }
+
+        ul {
+            list-style: none;
+            margin-top: 15px;
+        }
+
+        li {
+            padding: 14px;
+            background: var(--light-green);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        li .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .item-label {
+            font-weight: 600;
+        }
+
+        .item-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .future-payment {
+            border-left: 4px solid #f39c12;
+        }
+
+        .expense-item {
+            border-left: 4px solid var(--primary-green);
+        }
+
+        .income-item {
+            border-left: 4px solid #3498db;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- === SIDEBAR === -->
+    <div class="sidebar">
+        <div class="sidebar-logo">
+            <h1>💰 Dejan<br>Expenses Tracking</h1>
+            <span>Manage your money easily</span>
+            <button class="install-btn" onclick="installApp()">📲 Install App</button>
+        </div>
+        <nav class="sidebar-nav">
+            <button onclick="scrollToSection('balance')">💵 Balance</button>
+            <button onclick="scrollToSection('futureBalance')">📈 Future Balance</button>
+            <button onclick="scrollToSection('expenses')">📋 Expenses</button>
+            <button onclick="scrollToSection('future')">🔜 Future Payments</button>
+            <button onclick="scrollToSection('income')">💸 Incoming Money</button>
+            <button onclick="clearAllData()">🗑️ Clear All Data</button>
+        </nav>
+        <div class="sidebar-footer">
+            Data saves automatically ✅
+        </div>
+    </div>
+
+    <!-- === MAIN CONTENT === -->
+    <div class="main-content">
+
+        <!-- CURRENT BALANCE -->
+        <div class="section" id="balance">
+            <div class="balance-card">
+                <h2>Current Balance</h2>
+                <div class="balance-amount" id="balanceDisplay">₱0.00</div>
+            </div>
+
+            <div class="card" style="max-width: 500px; margin: 0 auto;">
+                <h3>💰 Set / Add to Balance</h3>
+                <input type="number" id="balanceInput" placeholder="Enter amount" step="0.01">
+                <button class="btn-primary" onclick="setBalance()">Update Balance</button>
+            </div>
+        </div>
+
+        <!-- FUTURE BALANCE PROJECTION -->
+        <div class="section" id="futureBalance">
+            <div class="future-balance-card">
+                <h3>📈 Future Balance Projection</h3>
+                <p style="margin-bottom:12px; font-size:0.9rem; opacity:0.9;">Auto-calculates based on incoming money & future payments</p>
+                <div id="futureBalanceList"></div>
+            </div>
+        </div>
+
+        <!-- EXPENSES & FUTURE PAYMENTS -->
+        <div class="grid">
+            <!-- EXPENSES -->
+            <div class="section" id="expenses">
+                <div class="card">
+                    <h3>📋 Expense Record</h3>
+                    <input type="text" id="expenseName" placeholder="What did you spend on? (e.g. Food)">
+                    <input type="text" id="expensePlace" placeholder="Where? (e.g. Grocery Store)">
+                    <input type="number" id="expenseAmount" placeholder="Amount" step="0.01">
+                    <button class="btn-primary" onclick="addExpense()">➕ Add Expense</button>
+                    <ul id="expenseList"></ul>
+                </div>
+            </div>
+
+            <!-- FUTURE PAYMENTS -->
+            <div class="section" id="future">
+                <div class="card">
+                    <h3>🔜 Future Payments / Bills</h3>
+                    <input type="text" id="futureName" placeholder="Bill / Payment Name">
+                    <input type="date" id="futureDate">
+                    <input type="number" id="futureAmount" placeholder="Amount" step="0.01">
+                    <button class="btn-primary" onclick="addFuturePayment()">➕ Add Payment</button>
+                    <ul id="futureList"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- INCOMING MONEY / BAON / ALLOWANCE -->
+        <div class="section" id="income">
+            <div class="card">
+                <h3>💸 Incoming Money / Allowance / Baon</h3>
+                <p style="margin-bottom:12px; font-size:0.9rem; color:var(--text-muted);">Example: Tomorrow you receive ₱300 allowance — it will show in Future Balance automatically</p>
+                <input type="text" id="incomeName" placeholder="Source / Name (e.g. Weekly Allowance)">
+                <input type="date" id="incomeDate">
+                <input type="number" id="incomeAmount" placeholder="Amount" step="0.01">
+                <button class="btn-primary" onclick="addIncome()">➕ Add Incoming Money</button>
+                <ul id="incomeList"></ul>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // === DATA STORAGE ===
+        let balance = parseFloat(localStorage.getItem('dejan_balance')) || 0;
+        let expenses = JSON.parse(localStorage.getItem('dejan_expenses')) || [];
+        let futurePayments = JSON.parse(localStorage.getItem('dejan_future')) || [];
+        let incomingMoney = JSON.parse(localStorage.getItem('dejan_income')) || [];
+
+        // === SAVE DATA ===
+        function saveData() {
+            localStorage.setItem('dejan_balance', balance.toFixed(2));
+            localStorage.setItem('dejan_expenses', JSON.stringify(expenses));
+            localStorage.setItem('dejan_future', JSON.stringify(futurePayments));
+            localStorage.setItem('dejan_income', JSON.stringify(incomingMoney));
+        }
+
+        // === FORMAT CURRENCY ===
+        function formatMoney(amount) {
+            return '₱' + parseFloat(amount).toLocaleString('en-US', {
+                minimumFractionDigits: 2, maximumFractionDigits: 2
+            });
+        }
+
+        // === FORMAT DATE ===
+        function formatDate(dateStr) {
+            if (!dateStr) return '—';
+            const d = new Date(dateStr + 'T00:00:00');
+            return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        }
+
+        // === UPDATE FUTURE BALANCE PROJECTION ===
+        function renderFutureBalanceProjection() {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+
+            let events = [];
+            incomingMoney.forEach(inc => {
+                if (inc.date) {
+                    events.push({
+                        date: inc.date,
+                        type: 'income',
+                        name: inc.name,
+                        amount: parseFloat(inc.amount)
+                    });
+                }
+            });
+
+            futurePayments.forEach(pay => {
+                if (pay.date) {
+                    events.push({
+                        date: pay.date,
+                        type: 'payment',
+                        name: pay.name,
+                        amount: -parseFloat(pay.amount)
+                    });
+                }
+            });
+
+            events.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+            let runningBalance = balance;
+            let html = '';
+            let lastDate = '';
+            events.forEach(ev => {
+                if (ev.date >= today.toISOString().split('T')[0]) {
+                    runningBalance += ev.amount;
+                    if (ev.date !== lastDate) {
+                        html += `
+                            <div class="future-balance-item">
+                                <span class="date">📅 ${formatDate(ev.date)}</span>
+                                <span class="amount">${formatMoney(runningBalance)}</span>
+                            </div>
+                        `;
+                        lastDate = ev.date;
+                    }
+                }
+            });
+
+            document.getElementById('futureBalanceList').innerHTML = html || `
+                <p style="opacity:0.8; font-style:italic;">Add incoming money or future payments to see your future balance here.</p>
+            `;
+        }
+
+        // === UPDATE ALL DISPLAYS ===
+        function updateDisplay() {
+            document.getElementById('balanceDisplay').textContent = formatMoney(balance);
+
+            const expenseList = document.getElementById('expenseList');
+            expenseList.innerHTML = '';
+            expenses.forEach((exp, idx) => {
+                expenseList.innerHTML += `
+                    <li class="expense-item">
+                        <div class="item-row">
+                            <span class="item-label">${exp.name}</span>
+                            <strong>${formatMoney(exp.amount)}</strong>
+                        </div>
+                        <div class="item-row">
+                            <span class="item-meta">📍 ${exp.place}</span>
+                            <button class="btn-delete" onclick="deleteExpense(${idx})">Delete</button>
+                        </div>
+                    </li>
+                `;
+            });
+
+            const futureList = document.getElementById('futureList');
+            futureList.innerHTML = '';
+            futurePayments.forEach((pay, idx) => {
+                futureList.innerHTML += `
+                    <li class="future-payment">
+                        <div class="item-row">
+                            <span class="item-label">${pay.name}</span>
+                            <strong>${formatMoney(pay.amount)}</strong>
+                        </div>
+                        <div class="item-row">
+                            <span class="item-meta">📅 ${formatDate(pay.date)}</span>
+                            <button class="btn-delete" onclick="deleteFuture(${idx})">Delete</button>
+                        </div>
+                    </li>
+                `;
+            });
+
+            const incomeList = document.getElementById('incomeList');
+            incomeList.innerHTML = '';
+            incomingMoney.forEach((inc, idx) => {
+                incomeList.innerHTML += `
+                    <li class="income-item">
+                        <div class="item-row">
+                            <span class="item-label">💸 ${inc.name}</span>
+                            <strong style="color:#27ae60;">+${formatMoney(inc.amount)}</strong>
+                        </div>
+                        <div class="item-row">
+                            <span class="item-meta">📅 ${formatDate(inc.date)}</span>
+                            <button class="btn-delete" onclick="deleteIncome(${idx})">Delete</button>
+                        </div>
+                    </li>
+                `;
+            });
+
+            renderFutureBalanceProjection();
+        }
+
+        // === BALANCE FUNCTIONS ===
+        function setBalance() {
+            const val = parseFloat(document.getElementById('balanceInput').value);
+            if (!isNaN(val)) {
+                balance = val;
+                saveData();
+                updateDisplay();
+                document.getElementById('balanceInput').value = '';
+            }
+        }
+
+        // === ADD EXPENSE ===
+        function addExpense() {
+            const name = document.getElementById('expenseName').value.trim();
+            const place = document.getElementById('expensePlace').value.trim();
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+
+            if (!name || !place || isNaN(amount) || amount <= 0) {
+                alert('Please fill all fields correctly!');
+                return;
+            }
+
+            balance -= amount;
+            expenses.unshift({ name, place, amount });
+            saveData();
+            updateDisplay();
+
+            document.getElementById('expenseName').value = '';
+            document.getElementById('expensePlace').value = '';
+            document.getElementById('expenseAmount').value = '';
+        }
+
+        // === DELETE EXPENSE ===
+        function deleteExpense(index) {
+            if (confirm('Delete this expense? Balance will be restored.')) {
+                balance += parseFloat(expenses[index].amount);
+                expenses.splice(index, 1);
+                saveData();
+                updateDisplay();
+            }
+        }
+
+        // === ADD FUTURE PAYMENT ===
+        function addFuturePayment() {
+            const name = document.getElementById('futureName').value.trim();
+            const date = document.getElementById('futureDate').value;
+            const amount = parseFloat(document.getElementById('futureAmount').value);
+
+            if (!name || !date || isNaN(amount) || amount <= 0) {
+                alert('Please fill all fields correctly!');
+                return;
+            }
+
+            futurePayments.unshift({ name, date, amount });
+            saveData();
+            updateDisplay();
+
+            document.getElementById('futureName').value = '';
+            document.getElementById('futureDate').value = '';
+            document.getElementById('futureAmount').value = '';
+        }
+
+        // === DELETE FUTURE PAYMENT ===
+        function deleteFuture(index) {
+            if (confirm('Delete this future payment?')) {
+                futurePayments.splice(index, 1);
+                saveData();
+                updateDisplay();
+            }
+        }
+
+        // === ADD INCOMING MONEY ===
+        function addIncome() {
+            const name = document.getElementById('incomeName').value.trim();
+            const date = document.getElementById('incomeDate').value;
+            const amount = parseFloat(document.getElementById('incomeAmount').value);
+
+            if (!name || !date || isNaN(amount) || amount <= 0) {
+                alert('Please fill all fields correctly!');
+                return;
+            }
+
+            incomingMoney.unshift({ name, date, amount });
+            saveData();
+            updateDisplay();
+
+            document.getElementById('incomeName').value = '';
+            document.getElementById('incomeDate').value = '';
+            document.getElementById('incomeAmount').value = '';
+        }
+
+        // === DELETE INCOME ===
+        function deleteIncome() {
+            if (confirm('Delete this incoming money?')) {
+                incomingMoney.splice(index, 1);
+                saveData();
+                updateDisplay();
+            }
+        }
+
+        // === SCROLL TO SECTION ===
+        function scrollToSection(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // === CLEAR ALL DATA ===
+        function clearAllData() {
+            if (confirm('⚠️ Are you sure you want to reset EVERYTHING? This cannot be undone!')) {
+                localStorage.clear();
+                balance = 0;
+                expenses = [];
+                futurePayments = [];
+                incomingMoney = [];
+                updateDisplay();
+            }
+        }
+
+        // === INITIAL LOAD ===
+        updateDisplay();
+    </script>
+</body>
+</html>
