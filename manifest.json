@@ -3,18 +3,18 @@
   "short_name": "Dejan Expenses",
   "description": "Track your expenses, balance, and future payments",
   "start_url": "/expenses.github.io/",
-"scope": "/expenses.github.io/",
+  "scope": "/expenses.github.io/",
   "display": "standalone",
   "background_color": "#f8fefb",
   "theme_color": "#219653",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "/expenses.github.io/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "icon-512.png",
+      "src": "/expenses.github.io/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
