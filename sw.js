@@ -1,11 +1,11 @@
 const CACHE_NAME = 'dejan-expenses-v1';
-const BASE = '/expenses.github.io/';
+const ROOT = '/expenses.github.io/';
 const ASSETS_TO_CACHE = [
-  BASE,
-  BASE + 'index.html',
-  BASE + 'manifest.json',
-  BASE + 'icon-192.png',
-  BASE + 'icon-512.png'
+  ROOT,
+  ROOT + 'index.html',
+  ROOT + 'manifest.json',
+  ROOT + 'icon-192.png',
+  ROOT + 'icon-512.png'
 ];
 
 self.addEventListener('install', (e) => {
